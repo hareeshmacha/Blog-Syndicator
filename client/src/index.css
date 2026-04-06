@@ -1,0 +1,66 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  body {
+    @apply bg-background text-slate-200 antialiased selection:bg-primary-500/30;
+  }
+}
+
+/* Custom Scrollbar for a premium feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
+}
+
+/* Make UIW Editor inherit dark mode properly */
+.w-md-editor {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.w-md-editor-toolbar {
+  background-color: transparent !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+.wmde-markdown {
+  background-color: transparent !important;
+  color: #e2e8f0 !important;
+}
+
+/* Restore Tailwind-stripped list styles inside the markdown renderer */
+.wmde-markdown ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.wmde-markdown ul ul {
+  list-style-type: circle !important;
+  margin-bottom: 0 !important;
+}
+
+.wmde-markdown ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Hide default fullscreen button from MDEditor, we handle expansion explicitly */
+.w-md-editor-toolbar li>button[data-name="fullscreen"] {
+  display: none !important;
+}
