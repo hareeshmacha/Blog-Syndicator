@@ -1,16 +1,16 @@
-# AI-Powered Omni-Channel Tech Blog Syndicator 🚀
+# AI-Powered Omni-Channel Tech Blog Syndicator 
 
 An advanced, full-stack blog publishing platform designed for developer advocates, technical writers, and software engineers. Write your markdown once, tailor the tone per-platform using Google Gemini AI, and publish simultaneously to Dev.to, Hashnode, and Blogger without ever copy-pasting.
 
-## ✨ Features
+##  Features
 
-- 📝 **Dual-Pane Markdown Editor:** Write natively in Markdown with real-time preview parsing.
-- 🤖 **Semantic Differential Syndication:** Use the AI sidebar to assign a unique tone (e.g., *Beginner Friendly*, *Executive Summary*) to specific platforms. 
-- 🛡️ **Absolute Markdown Fidelity:** The Gemini agent is strictly locked down to ensure programming `<code/>` blocks, tables, and headers are perfectly preserved while the narrative prose is rewritten for the audience.
-- 🔥 **Multi-Platform Dispatch:** Publish your generated variants simultaneously using native REST and GraphQL APIs.
-- 🖼️ **Media Library:** Unified Supabase storage bucket allowing you to upload images and instantly get markdown-compliant permanent URLs.
-- 💾 **Cloud Draft Auto-saving:** Never lose your work. Your local layout and text state is automatically synced to the PostgreSQL backend.
-- 🔗 **Canonical URL Protection:** The syndicator automatically waits for high-priority sites (like Dev.to) to publish, retrieves their live URL, and injects it into lower-priority payloads to prevent Google indexing penalties.
+-  **Dual-Pane Markdown Editor:** Write natively in Markdown with real-time preview parsing.
+-  **Semantic Differential Syndication:** Use the AI sidebar to assign a unique tone (e.g., *Beginner Friendly*, *Executive Summary*) to specific platforms. 
+-  **Absolute Markdown Fidelity:** The Gemini agent is strictly locked down to ensure programming `<code/>` blocks, tables, and headers are perfectly preserved while the narrative prose is rewritten for the audience.
+-  **Multi-Platform Dispatch:** Publish your generated variants simultaneously using native REST and GraphQL APIs.
+-  **Media Library:** Unified Supabase storage bucket allowing you to upload images and instantly get markdown-compliant permanent URLs.
+-  **Cloud Draft Auto-saving:** Never lose your work. Your local layout and text state is automatically synced to the PostgreSQL backend.
+-  **Canonical URL Protection:** The syndicator automatically waits for high-priority sites (like Dev.to) to publish, retrieves their live URL, and injects it into lower-priority payloads to prevent Google indexing penalties.
 
 ## 🛠️ Technology Stack
 
@@ -20,7 +20,7 @@ An advanced, full-stack blog publishing platform designed for developer advocate
 - **AI Core:** Google Generative AI (`gemini-flash-latest` REST deployment).
 - **Publishing Integrations:** Dev.to API (REST), Hashnode API (GraphQL), Blogger API (OAuth).
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 - Node.js (v18+)
@@ -66,5 +66,5 @@ npm run dev
 
 The application will now be running at `http://localhost:5173`. 
 
-## ⚙️ App Configuration
+##  App Configuration
 Upon creating an account in the UI, navigate to the **Settings** modal. Enter your respective Dev.to API Key, Hashnode API Key, and Blogger credentials. The backend securely saves these into your isolated Supabase profile to authorize your programmatic syndication bursts.
