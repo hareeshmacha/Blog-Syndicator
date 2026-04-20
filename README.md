@@ -12,7 +12,7 @@ An advanced, full-stack blog publishing platform designed for developer advocate
 -  **Cloud Draft Auto-saving:** Never lose your work. Your local layout and text state is automatically synced to the PostgreSQL backend.
 -  **Canonical URL Protection:** The syndicator automatically waits for high-priority sites (like Dev.to) to publish, retrieves their live URL, and injects it into lower-priority payloads to prevent Google indexing penalties.
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 - **Frontend:** React 18, TypeScript, Tailwind CSS, Vite, Lucide Icons, UIW Markdown Editor.
 - **Backend:** Node.js, Express, dotenv, CORS.
