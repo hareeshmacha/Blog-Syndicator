@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { marked } from 'marked';
 
 export interface PublishResult {
     platform: string;
@@ -24,7 +25,7 @@ export const publishToDevTo = async (
                 article: {
                     title,
                     body_markdown: content,
-                    published: false,
+                    published: true,
                     canonical_url: canonicalUrl
                 }
             })
@@ -119,62 +120,42 @@ export const publishToHashnode = async (
     }
 };
 
-export const publishToGhost = async (
+export const publishToBlogger = async (
     title: string,
     content: string,
-    apiUrl: string,
-    adminApiKey: string,
+    blogId: string,
+    accessToken: string,
     canonicalUrl?: string
 ): Promise<PublishResult> => {
     try {
-        const [id, secret] = adminApiKey.split(':');
-        if (!id || !secret) throw new Error('Invalid Ghost Admin API Key format');
+        let htmlContent = await marked.parse(content);
 
-        const token = jwt.sign({}, Buffer.from(secret, 'hex'), {
-            keyid: id,
-            algorithm: 'HS256',
-            expiresIn: '5m',
-            audience: `/admin/`
-        });
-
-        const mobiledoc = JSON.stringify({
-            version: '0.3.1',
-            markups: [],
-            atoms: [],
-            cards: [['markdown', { markdown: content }]],
-            sections: [[10, 0]]
-        });
-
-        const body: any = {
-            posts: [{
-                title,
-                mobiledoc,
-                status: 'draft',
-            }]
-        };
         if (canonicalUrl) {
-            body.posts[0].canonical_url = canonicalUrl;
+            htmlContent += `\n<br><br><p><i>Originally published at <a href="${canonicalUrl}">${canonicalUrl}</a></i></p>`;
         }
 
-        const ghostEndpoint = apiUrl.replace(/\/$/, '') + '/ghost/api/admin/posts/';
-        const response = await fetch(ghostEndpoint, {
+        const response = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`, {
             method: 'POST',
             headers: {
-                'Authorization': `Ghost ${token}`,
                 'Content-Type': 'application/json',
-                'Accept-Version': 'v5.0'
+                'Authorization': `Bearer ${accessToken}`
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify({
+                kind: 'blogger#post',
+                blog: { id: blogId },
+                title,
+                content: htmlContent
+            })
         });
 
         if (!response.ok) {
             const err = await response.text();
-            return { platform: 'Ghost', success: false, error: err };
+            return { platform: 'Blogger', success: false, error: err };
         }
 
         const data = await response.json();
-        return { platform: 'Ghost', success: true, url: data.posts[0].url };
+        return { platform: 'Blogger', success: true, url: data.url };
     } catch (error: any) {
-        return { platform: 'Ghost', success: false, error: error.message };
+        return { platform: 'Blogger', success: false, error: error.message };
     }
 };

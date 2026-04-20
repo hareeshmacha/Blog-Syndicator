@@ -1,17 +1,19 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const generateRouter = Router();
 
 if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not set');
 }
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
 generateRouter.post('/', async (req: Request, res: Response): Promise<Response> => {
     const content = req.body.content?.trim();
     const tone = req.body.tone?.trim();
+    const targetPlatform = req.body.targetPlatform?.trim();
 
     if (!content || !tone) {
         return res.status(400).json({ error: 'Missing content or tone parameter' });
@@ -22,17 +24,35 @@ generateRouter.post('/', async (req: Request, res: Response): Promise<Response> 
     }
 
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const prompt = targetPlatform ? `
+You are an expert developer advocate and technical writer. 
+Rewrite the following technical blog post specifically for the ${targetPlatform} platform's audience. Adopt a "${tone}" tone.
 
-        const prompt = `
+**CRITICAL INSTRUCTIONS — FOLLOW EXACTLY**:
+1. Output ONLY the raw Markdown text. Do NOT include conversational filler like "Here is your rewritten post:".
+2. You MUST preserve the EXACT same number of sections, headings, and paragraphs. Do NOT skip, merge, or omit ANY section.
+3. Maintain the EXACT original Markdown structure (Headings, bolding, bullet lists, numbered lists).
+4. Do NOT wrap the overall output in a \`\`\`markdown block.
+5. You MUST preserve ALL programming code blocks (both inline \`code\` and fenced \`\`\` blocks) perfectly — copy them character-for-character without modification.
+6. The output MUST be approximately the same length as the original. Do NOT summarize or shorten.
+7. Only rephrase the prose (the non-code text). Do not remove examples, explanations, or details.
+
+Original text:
+---
+${content}
+---
+` : `
 You are an expert developer advocate and technical writer. 
 Rewrite the following technical blog post to fit a "${tone}" tone.
 
-**CRITICAL INSTRUCTIONS**:
+**CRITICAL INSTRUCTIONS — FOLLOW EXACTLY**:
 1. Output ONLY the raw Markdown text. Do NOT include conversational filler like "Here is your rewritten post:".
-2. Maintain the EXACT original Markdown structure (Headings, bolding, bullet lists).
-3. Do NOT wrap the overall output in a \`\`\`markdown block.
-4. You MUST preserve all programming code blocks (both inline \`code\` and multi-line \`\`\` blocks) perfectly without modifying a single character inside them. The rewritten prose should seamlessly surround the preserved code.
+2. You MUST preserve the EXACT same number of sections, headings, and paragraphs. Do NOT skip, merge, or omit ANY section.
+3. Maintain the EXACT original Markdown structure (Headings, bolding, bullet lists, numbered lists).
+4. Do NOT wrap the overall output in a \`\`\`markdown block.
+5. You MUST preserve ALL programming code blocks (both inline \`code\` and fenced \`\`\` blocks) perfectly — copy them character-for-character without modification.
+6. The output MUST be approximately the same length as the original. Do NOT summarize or shorten.
+7. Only rephrase the prose (the non-code text). Do not remove examples, explanations, or details.
 
 Original text:
 ---
@@ -40,8 +60,45 @@ ${content}
 ---
 `;
 
-        const result = await model.generateContent(prompt);
-        let outputText = result.response.text();
+        let outputText = '';
+        let retries = 5;
+        let lastError: unknown = null;
+
+        while (retries > 0) {
+            try {
+                const response = await fetch(GEMINI_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: { maxOutputTokens: 8192, temperature: 0.7 }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`${response.status} ${errText}`);
+                }
+
+                const data = await response.json() as any;
+                outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                break;
+            } catch (err: any) {
+                lastError = err;
+                const errorStr = String(err.message || '');
+                if (errorStr.includes('503') || errorStr.includes('429')) {
+                    retries--;
+                    if (retries > 0) {
+                        console.log(`Gemini overload (${errorStr}), retrying in 3s...`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        continue;
+                    }
+                }
+                throw err;
+            }
+        }
+
+        if (!outputText) throw lastError;
 
         // Clean up conversational filler and markdown wrappers robustly
         let cleanText = outputText

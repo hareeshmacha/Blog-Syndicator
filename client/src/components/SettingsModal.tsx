@@ -13,8 +13,8 @@ export default function SettingsModal({ isOpen, onClose, userId }: SettingsModal
     const [saving, setSaving] = useState(false);
     const [devtoKey, setDevtoKey] = useState('');
     const [hashnodeKey, setHashnodeKey] = useState('');
-    const [ghostUrl, setGhostUrl] = useState('');
-    const [ghostKey, setGhostKey] = useState('');
+    const [bloggerId, setBloggerId] = useState('');
+    const [bloggerToken, setBloggerToken] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -37,8 +37,8 @@ export default function SettingsModal({ isOpen, onClose, userId }: SettingsModal
             if (data) {
                 setDevtoKey(data.devto_api_key || '');
                 setHashnodeKey(data.hashnode_api_key || '');
-                setGhostUrl(data.ghost_api_url || '');
-                setGhostKey(data.ghost_admin_api_key || '');
+                setBloggerId(data.blogger_blog_id || '');
+                setBloggerToken(data.blogger_access_token || '');
             }
         } catch (error: any) {
             console.error('Error fetching settings:', error);
@@ -59,8 +59,8 @@ export default function SettingsModal({ isOpen, onClose, userId }: SettingsModal
                     id: userId,
                     devto_api_key: devtoKey,
                     hashnode_api_key: hashnodeKey,
-                    ghost_api_url: ghostUrl,
-                    ghost_admin_api_key: ghostKey,
+                    blogger_blog_id: bloggerId,
+                    blogger_access_token: bloggerToken,
                     updated_at: new Date().toISOString()
                 });
 
@@ -144,26 +144,26 @@ export default function SettingsModal({ isOpen, onClose, userId }: SettingsModal
 
                             <div className="space-y-4 pt-6 border-t border-border">
                                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                    <span className="text-xl">👻</span> Ghost
+                                    <span className="text-xl">🟠</span> Blogger
                                 </h3>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-300 block">API URL</label>
+                                    <label className="text-sm font-medium text-slate-300 block">Blog ID</label>
                                     <input
-                                        type="url"
-                                        value={ghostUrl}
-                                        onChange={(e) => setGhostUrl(e.target.value)}
-                                        className="w-full bg-background border border-border text-white px-4 py-2.5 rounded-lg focus:outline-none focus:border-primary-500 text-sm"
-                                        placeholder="https://your-blog.ghost.io"
+                                        type="text"
+                                        value={bloggerId}
+                                        onChange={(e) => setBloggerId(e.target.value)}
+                                        className="w-full bg-background border border-border text-white px-4 py-2.5 rounded-lg focus:outline-none focus:border-primary-500 font-mono text-sm"
+                                        placeholder="00000000000000"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-300 block">Admin API Key</label>
+                                    <label className="text-sm font-medium text-slate-300 block">Google OAuth Access Token</label>
                                     <input
                                         type="password"
-                                        value={ghostKey}
-                                        onChange={(e) => setGhostKey(e.target.value)}
+                                        value={bloggerToken}
+                                        onChange={(e) => setBloggerToken(e.target.value)}
                                         className="w-full bg-background border border-border text-white px-4 py-2.5 rounded-lg focus:outline-none focus:border-primary-500 font-mono text-sm"
-                                        placeholder="••••••••••••••••••••"
+                                        placeholder="ya29.a0AfB_bY..."
                                     />
                                 </div>
                             </div>

@@ -1,6 +1,25 @@
+# Dependencies
 node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment Variables (CRITICAL: Do not push API keys)
 .env
+client/.env
+server/.env
+*.local
+
+# Build output
 dist/
+client/dist/
+server/dist/
 build/
+
+# Reports (Do not push to github repo)
+PROJECT_REPORT.txt
+VIVA_REPORT.txt
+*.txt
+
+# OS/Logs
 .DS_Store
 *.log

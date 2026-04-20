@@ -4,8 +4,8 @@ CREATE TABLE public.profiles (
   email text,
   devto_api_key text,
   hashnode_api_key text,
-  ghost_api_url text,
-  ghost_admin_api_key text,
+  blogger_blog_id text,
+  blogger_access_token text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

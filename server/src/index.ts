@@ -1,4 +1,5 @@
 import express from 'express';
+// Server reloaded with updated .env API key
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { publishRouter } from './routes/publish.js';

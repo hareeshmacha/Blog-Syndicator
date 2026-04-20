@@ -4,19 +4,20 @@ import { Save, Send, Sparkles, Settings, FileText, Image as ImageIcon, LogOut, L
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
 import SettingsModal from './components/SettingsModal';
+import MediaLibraryModal from './components/MediaLibraryModal';
 import type { Session } from '@supabase/supabase-js';
 
 const AVAILABLE_PLATFORMS = [
   { id: 'devto', name: 'Dev.to', icon: '💻' },
   { id: 'hashnode', name: 'Hashnode', icon: '📝' },
-  { id: 'ghost', name: 'Ghost', icon: '👻' },
+  { id: 'blogger', name: 'Blogger', icon: '🟠' },
 ];
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
 
   // View State
-  const [view, setView] = useState<'editor' | 'drafts'>('editor');
+  const [view, setView] = useState<'dashboard' | 'editor-same' | 'editor-diff' | 'drafts'>('dashboard');
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Editor State
@@ -26,13 +27,20 @@ function App() {
 
   // Modal & Loading States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMediaLibraryOpen, setIsMediaLibraryOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingPlatform, setGeneratingPlatform] = useState<string | null>(null);
 
   // AI Settings
   const [selectedTone, setSelectedTone] = useState<string>('Professional');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['devto', 'hashnode', 'ghost']);
+  const [platformTones, setPlatformTones] = useState<Record<string, string>>({});
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['devto', 'hashnode', 'blogger']);
+
+  // Multi-platform editing state
+  const [platformContents, setPlatformContents] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState<string>('base');
 
   // Drafts Data State
   const [drafts, setDrafts] = useState<any[]>([]);
@@ -133,14 +141,16 @@ function App() {
     setActiveDraftId(draft.id);
     setTitle(draft.title);
     setContent(draft.content);
-    setView('editor');
+    setView('editor-same');
   };
 
   const handleNewPost = () => {
     setActiveDraftId(null);
     setTitle('Untitled Post');
     setContent('');
-    setView('editor');
+    setPlatformContents({});
+    setActiveTab('base');
+    setView('dashboard');
   };
 
   const handleImageUpload = async (file: File) => {
@@ -247,6 +257,30 @@ function App() {
     }
   };
 
+  const handleGenerateSingle = async (platformId: string) => {
+    if (!content.trim()) return alert('Base post is empty.');
+
+    const platform = AVAILABLE_PLATFORMS.find(p => p.id === platformId);
+    setGeneratingPlatform(platformId);
+    setIsGenerating(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, tone: platformTones[platformId] || selectedTone, targetPlatform: platform?.name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPlatformContents(prev => ({ ...prev, [platformId]: data.result }));
+      setActiveTab(platformId);
+    } catch (err: any) {
+      alert(`Generation error for ${platform?.name}: ` + err.message);
+    } finally {
+      setIsGenerating(false);
+      setGeneratingPlatform(null);
+    }
+  };
+
   const togglePlatform = (platformId: string) => {
     setSelectedPlatforms(prev =>
       prev.includes(platformId)
@@ -274,7 +308,9 @@ function App() {
           title,
           content,
           platforms: selectedPlatforms,
-          userId: session?.user.id
+          userId: session?.user.id,
+          platformContents: view === 'editor-diff' && Object.keys(platformContents).length > 0 ? platformContents : undefined,
+          skipCanonicalLinks: view === 'editor-diff'
         })
       });
 
@@ -328,7 +364,7 @@ function App() {
           <div className="h-6 w-px bg-border"></div>
           <button
             onClick={handlePublish}
-            disabled={isPublishing || view !== 'editor'}
+            disabled={isPublishing || (view !== 'editor-same' && view !== 'editor-diff')}
             className="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white transition-all shadow-lg shadow-primary-600/20 font-medium text-sm disabled:opacity-50"
           >
             {isPublishing ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
@@ -353,10 +389,10 @@ function App() {
 
             <nav className="flex flex-col gap-2 flex-1">
               <button
-                onClick={() => setView('editor')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm text-left transition-colors ${view === 'editor' ? 'bg-primary-500/10 text-primary-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}>
+                onClick={() => setView('dashboard')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm text-left transition-colors ${view === 'editor-same' || view === 'editor-diff' || view === 'dashboard' ? 'bg-primary-500/10 text-primary-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}>
                 <FileEdit size={18} />
-                Editor
+                Editor Workspace
               </button>
               <button
                 onClick={() => setView('drafts')}
@@ -365,7 +401,9 @@ function App() {
                 Saved Drafts {drafts.length > 0 && <span className="ml-auto bg-slate-800 text-slate-300 text-xs py-0.5 px-2 rounded-full">{drafts.length}</span>}
               </button>
               <div className="flex flex-col gap-2 mt-4 mt-auto">
-                <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 transition-colors font-medium text-sm text-left opacity-30 cursor-not-allowed">
+                <button
+                  onClick={() => setIsMediaLibraryOpen(true)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors font-medium text-sm text-left">
                   <ImageIcon size={18} />
                   Media Library
                 </button>
@@ -374,7 +412,46 @@ function App() {
           </aside>
         )}
 
-        {view === 'editor' ? (
+        {view === 'dashboard' ? (
+          <section className="flex-1 flex flex-col bg-background/50 overflow-y-auto p-12 relative items-center justify-center">
+            <div className="max-w-4xl w-full">
+              <div className="mb-16 text-center">
+                <h2 className="text-4xl font-extrabold text-white mb-4 tracking-tight">What do you want to publish?</h2>
+                <p className="text-xl text-slate-400 max-w-2xl mx-auto">Choose an editorial flow for your next piece of content across platforms.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <button
+                  onClick={() => setView('editor-same')}
+                  className="group flex flex-col items-center justify-center bg-surface/40 hover:bg-slate-800/80 border-2 border-border hover:border-primary-500 rounded-3xl p-10 cursor-pointer transition-all h-[360px] text-left relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="bg-slate-800/80 w-20 h-20 rounded-2xl flex items-center justify-center mb-8 text-primary-400 group-hover:scale-110 transition-transform">
+                    <FileText size={36} />
+                  </div>
+                  <h3 className="text-3xl font-bold text-white mb-4 tracking-tight text-center relative z-10 group-hover:text-primary-400 transition-colors">Upload Same Content</h3>
+                  <p className="text-base text-slate-400 text-center relative z-10 leading-relaxed px-4">
+                    Standard post distribution. Automatically injects SEO Canonical Links cross-platform so search engines credit the primary article.
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => setView('editor-diff')}
+                  className="group flex flex-col items-center justify-center bg-surface/40 hover:bg-slate-800/80 border-2 border-border hover:border-indigo-500 rounded-3xl p-10 cursor-pointer transition-all h-[360px] text-left relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="bg-slate-800/80 w-20 h-20 rounded-2xl flex items-center justify-center mb-8 text-indigo-400 group-hover:scale-110 transition-transform">
+                    <Sparkles size={36} />
+                  </div>
+                  <h3 className="text-3xl font-bold text-white mb-4 tracking-tight text-center relative z-10 group-hover:text-indigo-400 transition-colors">Upload Diff Content</h3>
+                  <p className="text-base text-slate-400 text-center relative z-10 leading-relaxed px-4">
+                    Access the multi-tab layout to AI-tailor entirely unique copies per site. Publishes completely independently without any canonical links.
+                  </p>
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : view === 'editor-same' || view === 'editor-diff' ? (
           <>
             {/* Editor Area */}
             <section className="flex-1 flex flex-col bg-background relative overflow-hidden">
@@ -426,11 +503,41 @@ function App() {
                 </button>
               </div>
 
+              {/* Tabs for multi-editor */}
+              {view === 'editor-diff' && (
+                <div className="flex bg-slate-800/80 border-b border-border text-sm font-semibold px-6 pt-3 overflow-x-auto shrink-0 select-none">
+                  <button
+                    onClick={() => setActiveTab('base')}
+                    className={`px-4 py-2 border-b-2 transition-colors ${activeTab === 'base' ? 'border-primary-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileEdit size={16} /> Base Post
+                    </div>
+                  </button>
+                  {selectedPlatforms.map(pid => {
+                    const p = AVAILABLE_PLATFORMS.find(x => x.id === pid);
+                    return (
+                      <button
+                        key={pid}
+                        onClick={() => setActiveTab(pid)}
+                        className={`px-4 py-2 border-b-2 transition-colors flex items-center gap-2 ${activeTab === pid ? 'border-primary-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                      >
+                        <span>{p?.icon}</span> {p?.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Actual Editor */}
               <div className="flex-1 overflow-hidden relative" data-color-mode="dark">
                 <MDEditor
-                  value={content}
-                  onChange={(val) => setContent(val || '')}
+                  value={view === 'editor-diff' && activeTab !== 'base' ? (platformContents[activeTab] || '') : content}
+                  onChange={(val) => {
+                    const newValue = val || '';
+                    if (view === 'editor-diff' && activeTab !== 'base') setPlatformContents(prev => ({ ...prev, [activeTab]: newValue }));
+                    else setContent(newValue);
+                  }}
                   height="100%"
                   className="h-full border-none shadow-none text-left"
                   preview="live"
@@ -452,46 +559,89 @@ function App() {
                   <h2 className="font-semibold text-white">AI Assistant</h2>
                 </div>
 
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-sm text-slate-300">
-                  <p className="mb-4">Generate platform-specific variations of your post to maximize engagement.</p>
-                  <div className="mb-4">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Target Tone</label>
-                    <select
-                      value={selectedTone}
-                      onChange={(e) => setSelectedTone(e.target.value)}
-                      className="w-full bg-background border border-border text-white px-3 py-2 rounded-lg focus:outline-none focus:border-primary-500 text-sm"
-                    >
-                      <option value="Professional">Professional</option>
-                      <option value="Beginner Friendly">Beginner Friendly</option>
-                      <option value="Executive Summary">Executive Summary</option>
-                      <option value="Twitter/X Thread">Twitter/X Thread Style</option>
-                    </select>
+                {view === 'editor-same' && (
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-sm text-slate-300">
+                    <p className="mb-4">Let AI rewrite your base post instantly.</p>
+                    <div className="mb-4">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Target Tone</label>
+                      <select
+                        value={selectedTone}
+                        onChange={(e) => setSelectedTone(e.target.value)}
+                        className="w-full bg-background border border-border text-white px-3 py-2 rounded-lg focus:outline-none focus:border-primary-500 text-sm"
+                      >
+                        <option value="Professional">Professional</option>
+                        <option value="Beginner Friendly">Beginner Friendly</option>
+                        <option value="Executive Summary">Executive Summary</option>
+                      </select>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isGenerating || content.length < 10}
-                    className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                    {isGenerating ? 'Generating...' : 'Generate Variations'}
-                  </button>
-                </div>
+                )}
 
-                <div className="mt-8 flex-1">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Target Platforms</h3>
-                  <div className="flex flex-col gap-3">
-                    {AVAILABLE_PLATFORMS.map(platform => (
-                      <label key={platform.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-background cursor-pointer hover:border-slate-600 transition-colors">
-                        <input
-                          type="checkbox"
-                          className="rounded border-slate-600 bg-slate-800 accent-primary-500 w-4 h-4"
-                          checked={selectedPlatforms.includes(platform.id)}
-                          onChange={() => togglePlatform(platform.id)}
-                        />
-                        <span className="text-xl">{platform.icon}</span>
-                        <span className="font-medium text-slate-200">{platform.name}</span>
-                      </label>
-                    ))}
+                <div className="mt-8 flex-1 min-h-0 flex flex-col">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 shrink-0">Target Platforms</h3>
+                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[45vh] pr-1">
+                    {AVAILABLE_PLATFORMS.map(platform => {
+                      const isChecked = selectedPlatforms.includes(platform.id);
+                      return (
+                        <div key={platform.id} className={`flex flex-col rounded-lg border transition-colors ${isChecked ? 'border-primary-500/50 bg-slate-800/40' : 'border-border bg-background hover:border-slate-600'}`}>
+                          <label className="flex items-center gap-3 p-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-600 bg-slate-800 accent-primary-500 w-4 h-4"
+                              checked={isChecked}
+                              onChange={() => togglePlatform(platform.id)}
+                            />
+                            <span className="text-xl">{platform.icon}</span>
+                            <span className="font-medium text-slate-200">{platform.name}</span>
+                          </label>
+                          {isChecked && view === 'editor-diff' && (
+                            <div className="px-4 pb-3 flex flex-col gap-2">
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Specific Tone</label>
+                                <select
+                                  value={platformTones[platform.id] || 'Professional'}
+                                  onChange={(e) => setPlatformTones(prev => ({ ...prev, [platform.id]: e.target.value }))}
+                                  className="w-full bg-background border border-border text-slate-300 px-2 py-1.5 rounded focus:outline-none focus:border-primary-500 text-xs"
+                                >
+                                  <option value="Professional">Professional</option>
+                                  <option value="Beginner Friendly">Beginner Friendly</option>
+                                  <option value="Executive Summary">Executive Summary</option>
+                                </select>
+                              </div>
+                              <button
+                                onClick={() => handleGenerateSingle(platform.id)}
+                                disabled={isGenerating || content.length < 10}
+                                className="w-full py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
+                              >
+                                {generatingPlatform === platform.id ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                {generatingPlatform === platform.id ? 'Generating...' : `Generate for ${platform.name}`}
+                              </button>
+                              {platformContents[platform.id] && (
+                                <p className="text-[10px] text-green-400">✓ Content generated</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-slate-700/50">
+                    {view === 'editor-same' ? (
+                      <>
+                        <p className="text-xs text-slate-400 mb-3">Let AI rewrite your base post instantly.</p>
+                        <button
+                          onClick={handleGenerate}
+                          disabled={isGenerating || content.length < 10}
+                          className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-primary-600/20"
+                        >
+                          {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                          {isGenerating ? 'Generating...' : 'Rewrite Base Post'}
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-slate-400">Use the individual <strong>Generate</strong> buttons above to tailor content for each platform one at a time.</p>
+                    )}
                   </div>
                 </div>
               </aside>
@@ -561,6 +711,12 @@ function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        userId={session.user.id}
+      />
+
+      <MediaLibraryModal
+        isOpen={isMediaLibraryOpen}
+        onClose={() => setIsMediaLibraryOpen(false)}
         userId={session.user.id}
       />
     </div>
